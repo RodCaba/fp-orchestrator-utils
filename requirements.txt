@@ -1,0 +1,10 @@
+# gRPC
+grpcio==1.73.1
+grpcio-tools==1.73.1
+protobuf==6.31.1
+
+# Cloud 
+boto3==1.39.10
+
+# Development
+load_dotenv==0.1.0
