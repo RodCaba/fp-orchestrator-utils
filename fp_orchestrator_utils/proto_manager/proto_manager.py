@@ -19,11 +19,16 @@ class ProtoManager:
         Initializes the ProtoManager with S3 configuration.
         """
         self.config = S3Config(
-            access_key=os.getenv("AWS_ACCESS_KEY_ID"),
-            secret_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
-            bucket_name=os.getenv("S3_BUCKET_NAME"),
-            region=os.getenv("AWS_REGION")
+            access_key=os.getenv("AWS_ACCESS_KEY_ID", ""),
+            secret_key=os.getenv("AWS_SECRET_ACCESS_KEY", ""),
+            bucket_name=os.getenv("S3_BUCKET_NAME", ""),
+            region=os.getenv("AWS_REGION", "")
         )
+
+        # Fail if required environment variables are not set
+        if not all([self.config.access_key, self.config.secret_key, self.config.bucket_name]):
+            raise ValueError("Missing required environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, S3_BUCKET_NAME")
+        
         self.proto_prefix = os.getenv("S3_PROTO_PREFIX", "")
         self.proto_local_dir = Path(os.getenv("PROTO_LOCAL_DIR", "./proto"))
         self.grpc_output_dir = Path(os.getenv("PROTO_GRPC_OUTPUT_DIR", "./src/grpc"))
@@ -74,7 +79,7 @@ class ProtoManager:
         """
         # If no proto files are provided, upload all .proto files in the local directory
         if files is None:
-            proto_files = [os.path.join(self.proto_local_dir, f) for f in os.listdir(self.proto_local_dir) if f.endswith('.proto')]
+            proto_files = [Path(os.path.join(self.proto_local_dir, f)) for f in os.listdir(self.proto_local_dir) if f.endswith('.proto')]
         else:
             proto_files = [Path(f) for f in files if f.endswith('.proto')]
 
@@ -86,7 +91,9 @@ class ProtoManager:
                 continue
             try:
                 key = f"{self.proto_prefix}{proto_file.name}"
-                self.s3_service.upload(proto_file, key)
+                with open(proto_file, 'rb') as f:
+                    data = f.read()
+                    self.s3_service.save(data, key)
                 logger.info(f"Uploaded {proto_file} to S3 with key {key}")
             except Exception as e:
                 logger.error(f"Error uploading {proto_file}: {e}")
@@ -99,11 +106,15 @@ class ProtoManager:
         if proto_files is None:
             proto_files = [os.path.join(self.proto_local_dir, f) for f in os.listdir(self.proto_local_dir) if f.endswith('.proto')]
 
+        generated_files = []
         for proto_file in proto_files:
             try:
                 command = f"python -m grpc_tools.protoc -I{self.proto_local_dir} --python_out={self.grpc_output_dir} --grpc_python_out={self.grpc_output_dir} {proto_file}"
                 os.system(command)
                 logger.info(f"Generated gRPC code for {proto_file}")
+                generated_files.append(proto_file)
             except Exception as e:
                 logger.error(f"Error generating gRPC code for {proto_file}: {e}")
+
+        return generated_files
         

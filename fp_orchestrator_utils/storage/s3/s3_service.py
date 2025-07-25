@@ -1,6 +1,7 @@
 from ..abstractions import BaseStorage
 import boto3
 import logging
+from botocore.exceptions import ClientError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -43,11 +44,16 @@ class S3Service(BaseStorage):
         :param data: Data to be saved.
         :param key: Key under which the data will be stored.
         """
-        self.client.put_object(
-            Bucket=self.bucket_name,
-            Key=key,
-            Body=data
-        )
+        try:
+            self.client.put_object(
+                Bucket=self.bucket_name,
+                Key=key,
+                Body=data
+            )
+            return True
+        except ClientError as e:
+            logger.error(f"Failed to save data to S3: {e}")
+            return False
 
     def load(self, key: str):
         """
@@ -67,7 +73,11 @@ class S3Service(BaseStorage):
         :param file_path: Local file path to save the downloaded data.
         :return: Path to the downloaded file.
         """
-        self.client.download_file(self.bucket_name, key, file_path)
+        try:
+            self.client.download_file(self.bucket_name, key, file_path)
+        except ClientError as e:
+            logger.error(f"Failed to download {key} from S3: {e}")
+            return False
         return file_path
     
     def list_objects(self, prefix: str = ''):

@@ -3,3 +3,14 @@
 
 # Python cache
 __pycache__/
+
+# Proto and src directories created by the orchestrator tests
+proto/
+src/
+
+# Coverage reports
+.coverage
+htmlcov/
+
+# Testing cache
+.pytest_cache/
