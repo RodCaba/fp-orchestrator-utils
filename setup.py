@@ -1,12 +1,29 @@
 from setuptools import setup, find_packages
+import os
+from pathlib import Path
 
-with open("README.md", "r") as fh:
+here = Path(__file__).parent.resolve()
+
+with open(here / "README.md", "r") as fh:
     long_description = fh.read()
 
-with open("requirements.txt", "r") as req_file:
-    requirements = req_file.read().splitlines()
+requirements_file = here / "requirements.txt"
+if requirements_file.exists():
+    with open(requirements_file, "r") as req_file:
+        requirements = [
+            line.strip() for line in req_file.read().splitlines() if line.strip() and not line.startswith("#")
+        ]
+else:
+    requirements = [
+        "grpcio>=1.73.1",
+        "grpcio-tools>=1.73.1", 
+        "protobuf>=6.31.1",
+        "boto3>=1.39.10",
+        "python-dotenv>=1.0.0"
+    ]
 
-with open("LICENSE", "r") as license_file:
+
+with open(here / "LICENSE", "r") as license_file:
     license_text = license_file.read()
 
 setup(
