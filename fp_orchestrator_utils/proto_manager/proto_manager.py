@@ -109,7 +109,13 @@ class ProtoManager:
         generated_files = []
         for proto_file in proto_files:
             try:
-                command = f"python -m grpc_tools.protoc -I{self.proto_local_dir} --python_out={self.grpc_output_dir} --grpc_python_out={self.grpc_output_dir} {proto_file}"
+                command = f"""
+                python -m grpc_tools.protoc \
+                -I{self.proto_local_dir} \
+                --python_out={self.grpc_output_dir} \
+                --pyi_out={self.grpc_output_dir} \
+                --grpc_python_out={self.grpc_output_dir} {proto_file}
+                """
                 os.system(command)
                 logger.info(f"Generated gRPC code for {proto_file}")
                 generated_files.append(proto_file)

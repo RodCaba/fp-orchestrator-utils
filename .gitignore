@@ -17,3 +17,6 @@ htmlcov/
 
 # Distribution files
 dist/
+
+# Virtual environment
+.venv/
