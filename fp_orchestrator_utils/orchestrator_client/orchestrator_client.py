@@ -1,6 +1,24 @@
 import logging
 import grpc
-from ..src.grpc import orchestrator_service_pb2_grpc, orchestrator_service_pb2
+from pathlib import Path
+import os
+import sys
+import logging
+
+logger = logging.getLogger(__name__)
+
+grpc_dir = Path(__file__).parent.parent / "src/grpc"
+# Add the grpc directory to sys.path temporarily
+grpc_path_str = str(grpc_dir.absolute())
+if grpc_path_str not in sys.path:
+    sys.path.append(grpc_path_str)
+try:
+    import orchestrator_service_pb2  # type: ignore
+    import orchestrator_service_pb2_grpc  # type: ignore
+except ImportError as e:
+    logger.error(f"Failed to import gRPC modules: {e}")
+    raise RuntimeError("gRPC modules could not be loaded. Ensure they are generated correctly.")
+
 
 class OrchestratorClient:
     """
@@ -46,9 +64,13 @@ class OrchestratorClient:
         :return: True if the server is healthy, False otherwise.
         """
         try:
-            response = self.stub.HealthCheck(grpc.Empty(), timeout=self.timeout)
+            request = orchestrator_service_pb2.HealthCheckRequest()
+            response = self.stub.HealthCheck(
+                request,
+                timeout=self.timeout
+            )
             self.logger.info(f"Health check response: {response}")
-            return response.status == "SERVING"
+            return True
         except grpc.RpcError as e:
             self.logger.error(f"Health check failed: {e}")
             return False
