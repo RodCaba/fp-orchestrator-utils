@@ -5,8 +5,8 @@
 __pycache__/
 
 # Proto and src directories created by the orchestrator tests
-proto/
-src/
+./proto/
+./src/
 
 # Coverage reports
 .coverage
@@ -20,3 +20,6 @@ dist/
 
 # Virtual environment
 .venv/
+
+# Environment variables
+.env
