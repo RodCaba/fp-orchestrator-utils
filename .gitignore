@@ -17,6 +17,7 @@ htmlcov/
 
 # Distribution files
 dist/
+build/
 
 # Virtual environment
 .venv/
