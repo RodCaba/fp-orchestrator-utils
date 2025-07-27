@@ -121,6 +121,7 @@ class OrchestratorClient:
         :return: Response from the orchestrator.
         """
         try:
+            logger.info(f"Sending IMU data for device {device_id}: {imu_data}")
             if imu_data['sensor_type'] == "orientation":
                 values = imu_service_pb2.OrientationSensorValues(
                     qx=imu_data['values']['qx'],
