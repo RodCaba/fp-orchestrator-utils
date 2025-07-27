@@ -3,6 +3,7 @@ syntax = "proto3";
 package orchestrator_service;
 
 import "imu_service.proto";
+import "rfid_service.proto";
 
 service OrchestratorService {
   // HealthCheck is used to check the health of the orchestrator service.
@@ -13,6 +14,8 @@ service OrchestratorService {
 
   // Receive data from sensors.
   rpc ReceiveIMUData(imu_service.IMUPayload) returns (imu_service.IMUPayloadResponse);
+  // Receive RFID data from RFID sensor
+  rpc ReceiveRFIDData(rfid_service.RFIDPayload) returns (rfid_service.RFIDPayloadResponse);
 }
 
 message HealthCheckRequest {}

@@ -20,13 +20,11 @@ message HealthCheckResponse {
 
 message RFIDPayload {
   string device_id = 1;
-  double timestamp = 2; // Unix timestamp in seconds
-  repeated string tags = 3; // List of RFID tags
-  bool is_active = 4; // Indicates if the RFID reader is active
+  repeated string tags = 2; // List of RFID tags
+  int32 current_tags = 3; // Current count of tags read
 }
 
 message RFIDPayloadResponse {
   string device_id = 1;
-  double timestamp = 2; // Unix timestamp in seconds
-  string status = 3; // e.g., "success", "error"
+  string status = 2; // e.g., "success", "error"
 }

@@ -203,3 +203,39 @@ class OrchestratorClient:
         except Exception as e:
             self.logger.error(f"Unexpected error in send_imu_data: {e}")
             raise
+
+    def send_rfid_data(self, device_id: str, tags: list[str]):
+        """
+        Sends RFID data to the orchestrator.
+        :param device_id: ID of the RFID device.
+        :param tags: List of RFID tags.
+        :return: Response from the orchestrator.
+        """
+        try:
+            self.logger.info(f"Sending RFID data for device {device_id}: {tags}")
+            
+            if not isinstance(tags, list) or not all(isinstance(tag, str) for tag in tags):
+                raise ValueError("Tags must be a list of strings")
+            
+            request = orchestrator_service_pb2.RFIDPayload(
+                device_id=device_id,
+                tags=tags,
+                current_tags=len(tags)
+            )
+            
+            self.logger.debug(f"Sending request: {request}")
+            
+            response = self.stub.ReceiveRFIDData(request, timeout=self.timeout)
+            self.logger.debug(f"Received response: {response}")
+            
+            return self._parsed_response(
+                response,
+                field_mappings=["device_id", "status"]
+            )
+        except grpc.RpcError as e:
+            self.logger.error(f"gRPC error - Status: {e.code()}, Details: {e.details()}")
+            self.logger.error(f"Failed to send RFID data: {e}")
+            raise
+        except Exception as e:
+            self.logger.error(f"Unexpected error in send_rfid_data: {e}")
+            raise
