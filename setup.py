@@ -28,7 +28,7 @@ with open(here / "LICENSE", "r") as license_file:
 
 setup(
     name="fp-orchestrator-utils",
-    version="0.2.0",
+    version="0.2.1",
     author="Rodrigo",
     author_email="rodser4@gmail.com",
     description="Utilities for the FP Orchestrator, including CLI tools for managing Protocol Buffers",
