@@ -13,7 +13,7 @@ service IMUService {
 // The IMUPayload message contains sensor data from an IMU device.
 message IMUPayload {
   string device_id = 1;
-  SensorData data = 3;
+  SensorData data = 2;
 }
 
 message SensorData {
