@@ -19,6 +19,7 @@ try:
     import orchestrator_service_pb2_grpc  # type: ignore
     import imu_service_pb2  # type: ignore
     import imu_service_pb2_grpc  # type: ignore
+    import rfid_service_pb2  # type: ignore
 except ImportError as e:
     logger.error(f"Failed to import gRPC modules: {e}")
     raise RuntimeError("gRPC modules could not be loaded. Ensure they are generated correctly.")
@@ -216,8 +217,8 @@ class OrchestratorClient:
             
             if not isinstance(tags, list) or not all(isinstance(tag, str) for tag in tags):
                 raise ValueError("Tags must be a list of strings")
-            
-            request = orchestrator_service_pb2.RFIDPayload(
+
+            request = rfid_service_pb2.RFIDPayload(
                 device_id=device_id,
                 tags=tags,
                 current_tags=len(tags)
