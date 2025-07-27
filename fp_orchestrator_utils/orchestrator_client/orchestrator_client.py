@@ -121,8 +121,24 @@ class OrchestratorClient:
         :return: Response from the orchestrator.
         """
         try:
-            logger.info(f"Sending IMU data for device {device_id}: {imu_data}")
-            if imu_data['sensor_type'] == "orientation":
+            self.logger.info(f"Sending IMU data for device {device_id}: {imu_data}")
+            
+            # Validate input data
+            if 'sensor_type' not in imu_data:
+                raise ValueError("Missing 'sensor_type' in imu_data")
+            if 'values' not in imu_data:
+                raise ValueError("Missing 'values' in imu_data")
+            
+            sensor_type = imu_data['sensor_type']
+            self.logger.debug(f"Processing sensor type: {sensor_type}")
+            
+            if sensor_type == "orientation":
+                # Validate orientation data
+                required_fields = ['qx', 'qy', 'qz', 'qw', 'roll', 'pitch', 'yaw']
+                for field in required_fields:
+                    if field not in imu_data['values']:
+                        raise ValueError(f"Missing required field '{field}' for orientation sensor")
+                
                 values = imu_service_pb2.OrientationSensorValues(
                     qx=imu_data['values']['qx'],
                     qy=imu_data['values']['qy'],
@@ -136,29 +152,59 @@ class OrchestratorClient:
                     orientation=values
                 )
             else:
+                # Handle standard sensors (gravity, gyroscope, accelerometer, etc.)
+                required_fields = ['x', 'y', 'z']
+                for field in required_fields:
+                    if field not in imu_data['values']:
+                        raise ValueError(f"Missing required field '{field}' for {sensor_type} sensor")
+                
                 values = imu_service_pb2.StandardSensorValues(
-                    x=imu_data['values']['x'],
-                    y=imu_data['values']['y'],
-                    z=imu_data['values']['z']
+                    x=float(imu_data['values']['x']),
+                    y=float(imu_data['values']['y']),
+                    z=float(imu_data['values']['z'])
                 )
                 sensor_values = imu_service_pb2.SensorValues(
                     standard=values
                 )
+            
+            self.logger.debug(f"Created sensor values: {sensor_values}")
+            
             sensor_data = imu_service_pb2.SensorData(
-                sensor_type=imu_data['sensor_type'],
+                sensor_type=sensor_type,
                 values=sensor_values
             )
-            timestamp = int(datetime.now().timestamp())
+            
+            # Use the timestamp from the sensor data if available, otherwise use current time
+            if 'time' in imu_data:
+                # Convert nanoseconds to seconds if needed
+                timestamp = imu_data['time']
+                if timestamp > 1e12:  # If it looks like nanoseconds
+                    timestamp = int(timestamp / 1e9)
+                else:
+                    timestamp = int(timestamp)
+            else:
+                timestamp = int(datetime.now().timestamp())
+            
+            self.logger.debug(f"Using timestamp: {timestamp}")
+            
             request = imu_service_pb2.IMUPayload(
                 device_id=device_id,
                 timestamp=timestamp,
                 data=sensor_data,
             )
+            
+            self.logger.debug(f"Sending request: {request}")
             response = self.stub.ReceiveIMUData(request, timeout=self.timeout)
+            self.logger.debug(f"Received response: {response}")
+            
             return self._parsed_response(
                 response,
                 field_mappings=["device_id", "status", "timestamp"]
             )
         except grpc.RpcError as e:
+            self.logger.error(f"gRPC error - Status: {e.code()}, Details: {e.details()}")
             self.logger.error(f"Failed to send IMU data: {e}")
+            raise
+        except Exception as e:
+            self.logger.error(f"Unexpected error in send_imu_data: {e}")
             raise
