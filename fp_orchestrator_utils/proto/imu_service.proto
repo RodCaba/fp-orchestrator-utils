@@ -24,7 +24,7 @@ message SensorData {
 // The IMUPayloadResponse message is used to acknowledge the receipt of the IMU payload.
 message IMUPayloadResponse {
   string device_id = 1;
-  string status = 3; // e.g., "success", "error"
+  string status = 2; // e.g., "success", "error"
 }
 
 // The SensorValues message represents a single sensor reading with x, y, and z components.

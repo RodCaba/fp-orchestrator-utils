@@ -140,13 +140,13 @@ class OrchestratorClient:
                         raise ValueError(f"Missing required field '{field}' for orientation sensor")
                 
                 values = imu_service_pb2.OrientationSensorValues(
-                    qx=imu_data['values']['qx'],
-                    qy=imu_data['values']['qy'],
-                    qz=imu_data['values']['qz'],
-                    qw=imu_data['values']['qw'],
-                    roll=imu_data['values']['roll'],
-                    pitch=imu_data['values']['pitch'],
-                    yaw=imu_data['values']['yaw']
+                    qx=float(imu_data['values']['qx']),
+                    qy=float(imu_data['values']['qy']),
+                    qz=float(imu_data['values']['qz']),
+                    qw=float(imu_data['values']['qw']),
+                    roll=float(imu_data['values']['roll']),
+                    pitch=float(imu_data['values']['pitch']),
+                    yaw=float(imu_data['values']['yaw'])
                 )
                 sensor_values = imu_service_pb2.SensorValues(
                     orientation=values
@@ -180,6 +180,15 @@ class OrchestratorClient:
             )
             
             self.logger.debug(f"Sending request: {request}")
+            
+            # Test if the request can be serialized properly
+            try:
+                serialized_request = request.SerializeToString()
+                self.logger.debug(f"Request serialized successfully, size: {len(serialized_request)} bytes")
+            except Exception as e:
+                self.logger.error(f"Failed to serialize request: {e}")
+                raise ValueError(f"Invalid request data: {e}")
+                
             response = self.stub.ReceiveIMUData(request, timeout=self.timeout)
             self.logger.debug(f"Received response: {response}")
             
