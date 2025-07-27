@@ -174,41 +174,18 @@ class OrchestratorClient:
                 values=sensor_values
             )
             
-            # Use the timestamp from the sensor data if available, otherwise use current time
-            if 'time' in imu_data:
-                # Convert nanoseconds to seconds if needed
-                timestamp = imu_data['time']
-                if timestamp > 1e12:  # If it looks like nanoseconds
-                    timestamp = float(timestamp / 1e9)
-                else:
-                    timestamp = float(timestamp)
-            else:
-                timestamp = float(datetime.now().timestamp())
-            
-            self.logger.debug(f"Using timestamp: {timestamp}")
-            
             request = imu_service_pb2.IMUPayload(
                 device_id=device_id,
-                timestamp=timestamp,
                 data=sensor_data,
             )
             
             self.logger.debug(f"Sending request: {request}")
-            
-            # Log the serialized request for debugging
-            try:
-                serialized_request = request.SerializeToString()
-                self.logger.debug(f"Serialized request size: {len(serialized_request)} bytes")
-            except Exception as e:
-                self.logger.error(f"Failed to serialize request: {e}")
-                raise ValueError(f"Invalid request data: {e}")
-            
             response = self.stub.ReceiveIMUData(request, timeout=self.timeout)
             self.logger.debug(f"Received response: {response}")
             
             return self._parsed_response(
                 response,
-                field_mappings=["device_id", "status", "timestamp"]
+                field_mappings=["device_id", "status"]
             )
         except grpc.RpcError as e:
             self.logger.error(f"gRPC error - Status: {e.code()}, Details: {e.details()}")

@@ -13,7 +13,6 @@ service IMUService {
 // The IMUPayload message contains sensor data from an IMU device.
 message IMUPayload {
   string device_id = 1;
-  double timestamp = 2; // Unix timestamp in seconds
   SensorData data = 3;
 }
 
@@ -25,7 +24,6 @@ message SensorData {
 // The IMUPayloadResponse message is used to acknowledge the receipt of the IMU payload.
 message IMUPayloadResponse {
   string device_id = 1;
-  double timestamp = 2; // Unix timestamp in seconds
   string status = 3; // e.g., "success", "error"
 }
 
