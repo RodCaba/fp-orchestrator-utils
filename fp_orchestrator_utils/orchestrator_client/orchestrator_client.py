@@ -5,6 +5,7 @@ import os
 import sys
 import logging
 from typing import Any
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,8 @@ if grpc_path_str not in sys.path:
 try:
     import orchestrator_service_pb2  # type: ignore
     import orchestrator_service_pb2_grpc  # type: ignore
+    import imu_service_pb2  # type: ignore
+    import imu_service_pb2_grpc  # type: ignore
 except ImportError as e:
     logger.error(f"Failed to import gRPC modules: {e}")
     raise RuntimeError("gRPC modules could not be loaded. Ensure they are generated correctly.")
@@ -109,4 +112,22 @@ class OrchestratorClient:
             )
         except grpc.RpcError as e:
             self.logger.error(f"Failed to get orchestrator status: {e}")
+            raise
+        
+    def send_imu_data(self, device_id: str, imu_data: Any):
+        """
+        Sends IMU data to the orchestrator.
+        :param imu_data: IMU data to send.
+        :return: Response from the orchestrator.
+        """
+        try:
+            request = imu_service_pb2.IMUPayload(
+                device_id=device_id,
+                timestamp=int(datetime.now().timestamp()),
+                data=imu_data,
+            )
+            response = self.stub.ReceiveIMUData(request, timeout=self.timeout)
+            return response
+        except grpc.RpcError as e:
+            self.logger.error(f"Failed to send IMU data: {e}")
             raise
