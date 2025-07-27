@@ -5,7 +5,6 @@ import os
 import sys
 import logging
 from typing import Any
-from google.protobuf.json_format import MessageToDict
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +76,24 @@ class OrchestratorClient:
             self.logger.error(f"Health check failed: {e}")
             return False
         
+    def _parsed_response(self, response: Any, field_mappings: list[str]) -> dict:
+        """
+        Parses the gRPC response into a dictionary.
+        :param response: gRPC response object.
+        :return: Parsed response as a dictionary.
+        """
+        try:
+            status_dict = {}
+            for field in field_mappings:
+                if hasattr(response, field):
+                    status_dict[field] = getattr(response, field)
+                else:
+                    self.logger.warning(f"Field {field} not found in response.")
+            return status_dict
+        except Exception as e:
+            self.logger.error(f"Failed to parse response: {e}")
+            return {}
+        
     def get_orchestrator_status(self):
         """
         Retrieves the status of the orchestrator.
@@ -86,7 +103,10 @@ class OrchestratorClient:
             request = orchestrator_service_pb2.OrchestratorStatusRequest()
             response = self.stub.OrchestratorStatus(request, timeout=self.timeout)
 
-            return response
+            return self._parsed_response(
+                response,
+                field_mappings=["is_ready", "current_activity"]
+            )
         except grpc.RpcError as e:
             self.logger.error(f"Failed to get orchestrator status: {e}")
             raise
