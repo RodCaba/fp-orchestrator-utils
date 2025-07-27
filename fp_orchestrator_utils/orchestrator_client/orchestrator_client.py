@@ -121,13 +121,17 @@ class OrchestratorClient:
         :return: Response from the orchestrator.
         """
         try:
+            timestamp = int(datetime.now().timestamp())
             request = imu_service_pb2.IMUPayload(
                 device_id=device_id,
-                timestamp=int(datetime.now().timestamp()),
+                timestamp=timestamp,
                 data=imu_data,
             )
             response = self.stub.ReceiveIMUData(request, timeout=self.timeout)
-            return response
+            return self._parsed_response(
+                response,
+                field_mappings=["device_id", "status", "timestamp"]
+            )
         except grpc.RpcError as e:
             self.logger.error(f"Failed to send IMU data: {e}")
             raise
