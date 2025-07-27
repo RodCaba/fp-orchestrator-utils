@@ -179,11 +179,11 @@ class OrchestratorClient:
                 # Convert nanoseconds to seconds if needed
                 timestamp = imu_data['time']
                 if timestamp > 1e12:  # If it looks like nanoseconds
-                    timestamp = int(timestamp / 1e9)
+                    timestamp = float(timestamp / 1e9)
                 else:
-                    timestamp = int(timestamp)
+                    timestamp = float(timestamp)
             else:
-                timestamp = int(datetime.now().timestamp())
+                timestamp = float(datetime.now().timestamp())
             
             self.logger.debug(f"Using timestamp: {timestamp}")
             
@@ -194,6 +194,15 @@ class OrchestratorClient:
             )
             
             self.logger.debug(f"Sending request: {request}")
+            
+            # Log the serialized request for debugging
+            try:
+                serialized_request = request.SerializeToString()
+                self.logger.debug(f"Serialized request size: {len(serialized_request)} bytes")
+            except Exception as e:
+                self.logger.error(f"Failed to serialize request: {e}")
+                raise ValueError(f"Invalid request data: {e}")
+            
             response = self.stub.ReceiveIMUData(request, timeout=self.timeout)
             self.logger.debug(f"Received response: {response}")
             
