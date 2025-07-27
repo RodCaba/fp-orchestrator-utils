@@ -20,6 +20,7 @@ try:
     import imu_service_pb2  # type: ignore
     import imu_service_pb2_grpc  # type: ignore
     import rfid_service_pb2  # type: ignore
+    import audio_service_pb2  # type: ignore
 except ImportError as e:
     logger.error(f"Failed to import gRPC modules: {e}")
     raise RuntimeError("gRPC modules could not be loaded. Ensure they are generated correctly.")
@@ -239,4 +240,51 @@ class OrchestratorClient:
             raise
         except Exception as e:
             self.logger.error(f"Unexpected error in send_rfid_data: {e}")
+            raise
+
+    def send_audio_data(self, audio_payload: dict):
+        """
+        Sends audio data to the orchestrator.
+        :param audio_payload: Dictionary containing audio data.
+        :return: Response from the orchestrator.
+        """
+        try:
+            self.logger.info(f"Sending audio data: {audio_payload}")
+            
+            if 'session_id' not in audio_payload or 'features' not in audio_payload:
+                raise ValueError("Missing 'session_id' or 'features' in audio_payload")
+
+            session_id = audio_payload['session_id']
+            sample_rate = audio_payload.get('sample_rate', 16000)
+            channels = audio_payload.get('channels', 1)
+            features = audio_payload['features']
+            parameters = audio_payload.get('parameters', {})
+
+            # Check for features format
+            if 'feature_type' not in features or 'feature_shape' not in features or 'feature_data' not in features or 'data_type' not in features:
+                raise ValueError("Features must contain 'feature_type', 'feature_shape', 'feature_data', and 'data_type' fields")
+
+            request = audio_service_pb2.AudioPayload(
+                session_id=session_id,
+                sample_rate=sample_rate,
+                channels=channels,
+                features=features,
+                parameters=parameters
+            )
+            
+            self.logger.debug(f"Sending request: {request}")
+            
+            response = self.stub.ReceiveAudioData(request, timeout=self.timeout)
+            self.logger.debug(f"Received response: {response}")
+            
+            return self._parsed_response(
+                response,
+                field_mappings=["session_id", "status"]
+            )
+        except grpc.RpcError as e:
+            self.logger.error(f"gRPC error - Status: {e.code()}, Details: {e.details()}")
+            self.logger.error(f"Failed to send audio data: {e}")
+            raise
+        except Exception as e:
+            self.logger.error(f"Unexpected error in send_audio_data: {e}")
             raise
