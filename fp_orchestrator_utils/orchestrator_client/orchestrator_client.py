@@ -121,11 +121,37 @@ class OrchestratorClient:
         :return: Response from the orchestrator.
         """
         try:
+            if imu_data['sensor_type'] == "orientation":
+                values = imu_service_pb2.OrientationSensorValues(
+                    qx=imu_data['values']['qx'],
+                    qy=imu_data['values']['qy'],
+                    qz=imu_data['values']['qz'],
+                    qw=imu_data['values']['qw'],
+                    roll=imu_data['values']['roll'],
+                    pitch=imu_data['values']['pitch'],
+                    yaw=imu_data['values']['yaw']
+                )
+                sensor_values = imu_service_pb2.SensorValues(
+                    orientation=values
+                )
+            else:
+                values = imu_service_pb2.StandardSensorValues(
+                    x=imu_data['values']['x'],
+                    y=imu_data['values']['y'],
+                    z=imu_data['values']['z']
+                )
+                sensor_values = imu_service_pb2.SensorValues(
+                    standard=values
+                )
+            sensor_data = imu_service_pb2.SensorData(
+                sensor_type=imu_data['sensor_type'],
+                values=sensor_values
+            )
             timestamp = int(datetime.now().timestamp())
             request = imu_service_pb2.IMUPayload(
                 device_id=device_id,
                 timestamp=timestamp,
-                data=imu_data,
+                data=sensor_data,
             )
             response = self.stub.ReceiveIMUData(request, timeout=self.timeout)
             return self._parsed_response(

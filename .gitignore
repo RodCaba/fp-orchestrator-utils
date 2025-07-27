@@ -7,6 +7,7 @@ __pycache__/
 # Proto and src directories created by the orchestrator tests
 ./proto/
 ./src/
+src/grpc/
 
 # Coverage reports
 .coverage
