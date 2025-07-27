@@ -4,6 +4,8 @@ from pathlib import Path
 import os
 import sys
 import logging
+from typing import Any
+from google.protobuf.json_format import MessageToDict
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +77,7 @@ class OrchestratorClient:
             self.logger.error(f"Health check failed: {e}")
             return False
         
-    def get_orchestrator_status(self):
+    def get_orchestrator_status(self) -> dict[str, Any]:
         """
         Retrieves the status of the orchestrator.
         :return: Orchestrator status response.
@@ -83,8 +85,24 @@ class OrchestratorClient:
         try:
             request = orchestrator_service_pb2.OrchestratorStatusRequest()
             response = self.stub.OrchestratorStatus(request, timeout=self.timeout)
-            self.logger.info(f"Orchestrator status response: {response}")
-            return response
+
+            # Debug: Log the raw protobuf response
+            self.logger.info(f"Raw protobuf response: {response}")
+            self.logger.info(f"Response type: {type(response)}")
+            
+            # Try different conversion approaches
+            response_dict = MessageToDict(response)
+            self.logger.info(f"MessageToDict result: {response_dict}")
+            
+            # Alternative: Try with preserving proto field names
+            response_dict_alt = MessageToDict(response, preserving_proto_field_name=True)
+            self.logger.info(f"MessageToDict with preserving_proto_field_name: {response_dict_alt}")
+            
+            # Alternative: Try with including default values
+            response_dict_defaults = MessageToDict(response, including_default_value_fields=True)
+            self.logger.info(f"MessageToDict with including_default_value_fields: {response_dict_defaults}")
+            
+            return response_dict_defaults
         except grpc.RpcError as e:
             self.logger.error(f"Failed to get orchestrator status: {e}")
             raise
