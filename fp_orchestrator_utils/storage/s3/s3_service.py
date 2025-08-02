@@ -90,6 +90,15 @@ class S3Service(BaseStorage):
         logger.info(f"Listing objects with prefix: {prefix}")
         response = self.client.list_objects_v2(Bucket=self.bucket_name, Prefix=prefix)
         return [obj['Key'] for obj in response.get('Contents', [])]
+    
+    def get_paginator(self, prefix: str = ''):
+        """
+        Get a paginator for listing objects in the S3 bucket.
+
+        :param prefix: Prefix to filter the objects.
+        :return: Paginator object.
+        """
+        return self.client.get_paginator('list_objects_v2').paginate(Bucket=self.bucket_name, Prefix=prefix)
 
     def is_connected(self):
         try:
