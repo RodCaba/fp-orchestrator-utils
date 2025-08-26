@@ -91,6 +91,16 @@ class S3Service(BaseStorage):
         response = self.client.list_objects_v2(Bucket=self.bucket_name, Prefix=prefix)
         return [obj['Key'] for obj in response.get('Contents', [])]
     
+    def count_objects(self, prefix: str = '') -> int:
+        """
+        Count objects in the S3 bucket with a given prefix.
+
+        :param prefix: Prefix to filter the objects.
+        :return: Number of objects in the bucket with the given prefix.
+        """
+        response = self.client.list_objects_v2(Bucket=self.bucket_name, Prefix=prefix)
+        return len(response.get('Contents', []))
+    
     def get_paginator(self, prefix: str = ''):
         """
         Get a paginator for listing objects in the S3 bucket.

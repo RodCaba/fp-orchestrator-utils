@@ -25,3 +25,6 @@ build/
 
 # Environment variables
 .env
+
+# Data samples
+data_sample.json
