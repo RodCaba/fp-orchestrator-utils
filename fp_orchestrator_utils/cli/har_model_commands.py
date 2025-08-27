@@ -1,5 +1,7 @@
 import logging
+import torch
 from ..src.data_loader import DataLoader
+from ..src.har_inference import HARModel, HARTrainer
 
 logger = logging.getLogger(__name__)
 
@@ -10,6 +12,11 @@ def setup_har_model_commands(subparsers):
     
     # Train command
     train_parser = har_subparsers.add_parser('train', help='Train HAR model')
+    train_parser.add_argument('--export-onnx', action='store_true', help='Export trained model to ONNX format')
+    train_parser.add_argument('--epochs', type=int, default=50, help='Number of training epochs')
+    train_parser.add_argument('--use-local-data', action='store_true', help='Use local data instead of S3, make sure data is in the local directory')
+    train_parser.add_argument('--save-data-locally', action='store_true', help='Save loaded S3 data locally')
+    train_parser.add_argument('--resume-training', action='store_true', default=True, help='Resume training from last checkpoint if available')
     train_parser.set_defaults(func=cmd_train_har_model)
     
     """ # Evaluate command
@@ -24,14 +31,47 @@ def cmd_train_har_model(args):
     """ Train HAR model command. """
     try:
         data_loader = DataLoader()
-        raw_data = data_loader.load_data_from_s3()
-        logger.info(f"Loaded {len(raw_data)} data files from S3")
+        if args.use_local_data:
+            raw_data = data_loader.load_local_data()
+            logger.info(f"Loaded {len(raw_data)} data files from local directory")
+        else:
+            raw_data = data_loader.load_data_from_s3(save_locally=args.save_data_locally)
+            logger.info(f"Loaded {len(raw_data)} data files from S3")
         if not raw_data:
             logger.error("No data loaded from S3. Aborting training.")
             return 1
         
         features, labels = data_loader.preprocess_data(raw_data)
-        logger.info(f"Preprocessed features and labels: {features}, {labels}")
+        # Determine number of classes
+        num_classes = len(set(labels))
+        logger.info(f"Number of classes: {num_classes}")
+
+        # Create model and trainer
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        logger.info(f"Using device: {device}")
+
+        model = HARModel(num_classes)
+        trainer = HARTrainer(model, device)
+
+        # Prepare data
+        train_loader, val_loader = trainer.prepare_data(features, labels)
+        # Get resume_training flag from args if provided, default to True
+        resume_training = getattr(args, 'resume_training', True)
+        trainer.train(
+            train_loader,
+            val_loader,
+            epochs=args.epochs if hasattr(args, 'epochs') else 50,
+            resume_from_checkpoint=resume_training
+        )
+        
+
+        logger.info("Training process completed.")
+
+        if args.export_onnx:
+            trainer.export_to_onnx("har_model.onnx")
+            logger.info("Model exported to ONNX")
+
+        logger.info("HAR model training completed successfully")
         return 0
     except Exception as e:
         logger.error(f"Error during HAR model training: {e}")

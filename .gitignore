@@ -28,3 +28,8 @@ build/
 
 # Data samples
 data_sample.json
+orchestrator_data/*
+features_labels_debug.json
+
+# Best model checkpoint
+best_har_model.pth
