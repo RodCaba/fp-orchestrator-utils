@@ -183,16 +183,23 @@ class HARTrainer:
         Exports the trained model to ONNX format.
         """
         self.model.eval()
+        batch_size = 1
+        seq_length = 50
         # Create dummy inputs with correct shapes
         dummy_sensor_data = {
-            'accelerometer': torch.randn(1, 50, 3),
-            'gyroscope': torch.randn(1, 50, 3),
-            'total_acceleration': torch.randn(1, 50, 3),
-            'gravity': torch.randn(1, 50, 3),
-            'orientation': torch.randn(1, 50, 7),
-            'audio': torch.randn(1, 64, 126)
+            'accelerometer': torch.randn(batch_size, seq_length, 3),
+            'gyroscope': torch.randn(batch_size, seq_length, 3),
+            'totalacceleration': torch.randn(batch_size, seq_length, 3),
+            'gravity': torch.randn(batch_size, seq_length, 3),
+            'orientation': torch.randn(batch_size, seq_length, 7),
+            'audio': torch.randn(batch_size, 5, 64, 126)
         }
         dummy_n_users = torch.tensor([1.0], dtype=torch.float32)
+        # Move to device
+        for sensor_type in dummy_sensor_data:
+            dummy_sensor_data[sensor_type] = dummy_sensor_data[sensor_type].to(self.device)
+        dummy_n_users = dummy_n_users.to(self.device)
+
         torch.onnx.export(
             self.model,
             (dummy_sensor_data, dummy_n_users),
@@ -202,9 +209,8 @@ class HARTrainer:
             do_constant_folding=True,
             input_names=['sensor_data', 'n_users'],
             output_names=['output'],
-            dynamic_axes={'sensor_data': {0: 'batch_size', 1: 'sequence_length'},
-                          'n_users': {0: 'batch_size'},
-                          'output': {0: 'batch_size'}}
+            dynamic_axes={'sensor_data': {1: 'sequence_length'},
+                          'output': {}}
         )
         logger.info(f"Model exported to {onnx_path}")
 

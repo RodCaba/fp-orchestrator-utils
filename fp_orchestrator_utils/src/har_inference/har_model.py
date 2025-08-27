@@ -57,8 +57,8 @@ class HARModel(nn.Module):
         else:
             features.append(torch.zeros(sensor_data[next(iter(sensor_data))].size(0), self.imu_feature_size))
 
-        if 'total_acceleration' in sensor_data:
-            total_acc_feat = self.total_acceleration_processor(sensor_data['total_acceleration'])
+        if 'totalacceleration' in sensor_data:
+            total_acc_feat = self.total_acceleration_processor(sensor_data['totalacceleration'])
             features.append(total_acc_feat)
         else:
             features.append(torch.zeros(sensor_data[next(iter(sensor_data))].size(0), self.imu_feature_size))
