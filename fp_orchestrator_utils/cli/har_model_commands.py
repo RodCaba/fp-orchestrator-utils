@@ -16,7 +16,7 @@ def setup_har_model_commands(subparsers):
     train_parser.add_argument('--epochs', type=int, default=50, help='Number of training epochs')
     train_parser.add_argument('--use-local-data', action='store_true', help='Use local data instead of S3, make sure data is in the local directory')
     train_parser.add_argument('--save-data-locally', action='store_true', help='Save loaded S3 data locally')
-    train_parser.add_argument('--resume-training', action='store_true', default=True, help='Resume training from last checkpoint if available')
+    train_parser.add_argument('--clean-training', action='store_true', default=False, help='Clean training, ignore previous checkpoints')
     train_parser.set_defaults(func=cmd_train_har_model)
     
     """ # Evaluate command
@@ -55,8 +55,9 @@ def cmd_train_har_model(args):
 
         # Prepare data
         train_loader, val_loader = trainer.prepare_data(features, labels)
-        # Get resume_training flag from args if provided, default to True
-        resume_training = getattr(args, 'resume_training', True)
+        # Get clean_training flag from args if provided, default to False
+        clean_training = getattr(args, 'clean_training', False)
+        resume_training = not clean_training  # Set resume_training based on clean_training
         trainer.train(
             train_loader,
             val_loader,
