@@ -18,14 +18,6 @@ def setup_har_model_commands(subparsers):
     train_parser.add_argument('--save-data-locally', action='store_true', help='Save loaded S3 data locally')
     train_parser.add_argument('--clean-training', action='store_true', default=False, help='Clean training, ignore previous checkpoints')
     train_parser.set_defaults(func=cmd_train_har_model)
-    
-    """ # Evaluate command
-    evaluate_parser = har_subparsers.add_parser('evaluate', help='Evaluate HAR model')
-    evaluate_parser.set_defaults(func=cmd_evaluate_har_model)
-    
-    # Predict command
-    predict_parser = har_subparsers.add_parser('predict', help='Predict using HAR model')
-    predict_parser.set_defaults(func=cmd_predict_har_model) """
 
 def cmd_train_har_model(args):
     """ Train HAR model command. """
