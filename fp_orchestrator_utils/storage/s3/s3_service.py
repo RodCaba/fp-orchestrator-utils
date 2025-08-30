@@ -67,7 +67,7 @@ class S3Service(BaseStorage):
     
     def download(self, key: str, file_path: str):
         """
-        Download data from S3 bucket using a key.
+        Download a file from S3 bucket using a key.
         
         :param key: Key for the data to be downloaded.
         :param file_path: Local file path to save the downloaded data.
@@ -79,6 +79,21 @@ class S3Service(BaseStorage):
             logger.error(f"Failed to download {key} from S3: {e}")
             return False
         return file_path
+    
+    def upload(self, file_path: str, key: str) -> bool:
+        """
+        Upload a file to S3 bucket.
+
+        :param file_path: Local file path to be uploaded.
+        :param key: Key under which the file will be stored in S3.
+        :return: True if upload was successful, False otherwise.
+        """
+        try: 
+            self.client.upload_file(file_path, self.bucket_name, key)
+            return True
+        except ClientError as e:
+            logger.error(f"Failed to upload {file_path} to S3: {e}")
+            return False
     
     def list_objects(self, prefix: str = ''):
         """

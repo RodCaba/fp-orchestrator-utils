@@ -4,6 +4,7 @@ import torch.nn as nn
 import numpy as np
 import logging
 import os
+from fp_orchestrator_utils.storage.s3 import S3Service, S3Config
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,14 @@ class HARTrainer:
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
         self.best_val_acc = 0.0
         self.start_epoch = 0
+        self.model_prefix = os.getenv("S3_MODEL_PREFIX", "har_model/")
+
+        s3_config = S3Config(
+            access_key=os.getenv("AWS_ACCESS_KEY_ID", ""),
+            secret_key=os.getenv("AWS_SECRET_ACCESS_KEY", ""),
+            bucket_name=os.getenv("S3_BUCKET_NAME", ""),
+        )
+        self.s3_service = S3Service(s3_config)
 
     def prepare_data(self, upload_features: list, labels: np.ndarray) -> tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
         """
@@ -73,6 +82,11 @@ class HARTrainer:
         Loads model checkpoint.
         """
         try:
+            # Loads the checkpoint from S3
+            downloaded = self.s3_service.download(self.model_prefix + 'best_har_model.pth', checkpoint_path)
+            if not downloaded:
+                logger.warning("No checkpoint found in S3.")
+                return False
             if not os.path.exists(checkpoint_path):
                 logger.warning(f"Checkpoint file {checkpoint_path} does not exist.")
                 return False
@@ -175,7 +189,12 @@ class HARTrainer:
             except Exception as e:
                 logger.error(f"Error during training at epoch {epoch+1}: {e}")
                 continue
-
+        # Upload the best model to S3
+        try:
+            self.s3_service.upload('best_har_model.pth', self.model_prefix + 'best_har_model.pth')
+            logger.info("Uploaded best model to S3.")
+        except Exception as e:
+            logger.error(f"Failed to upload best model to S3: {e}")
         logger.info("Training completed.")
 
     def export_to_onnx(self, onnx_path: str = 'har_model.onnx'):
@@ -213,6 +232,13 @@ class HARTrainer:
                           'output': {}}
         )
         logger.info(f"Model exported to {onnx_path}")
+
+        try:
+            self.s3_service.upload(onnx_path, self.model_prefix + onnx_path)
+            logger.info("Uploaded ONNX model to S3.")
+        except Exception as e:
+            logger.error(f"Failed to upload ONNX model to S3: {e}")
+        logger.info("Export to ONNX completed.")
 
 class VariableLengthDataset(torch.utils.data.Dataset):
     def __init__(self, upload_features: list, labels: np.ndarray):
