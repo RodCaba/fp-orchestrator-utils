@@ -3,6 +3,7 @@ import argparse
 import sys
 
 from .proto_commands import setup_proto_commands
+from .har_model_commands import setup_har_model_commands
 
 # Load environment variables
 load_dotenv()
@@ -18,6 +19,7 @@ def main():
 
     subparsers = parser.add_subparsers(dest='command', required=True, help='Available commands')
     setup_proto_commands(subparsers)
+    setup_har_model_commands(subparsers)
 
     args = parser.parse_args()
 

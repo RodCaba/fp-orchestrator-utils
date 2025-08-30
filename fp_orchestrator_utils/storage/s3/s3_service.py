@@ -67,7 +67,7 @@ class S3Service(BaseStorage):
     
     def download(self, key: str, file_path: str):
         """
-        Download data from S3 bucket using a key.
+        Download a file from S3 bucket using a key.
         
         :param key: Key for the data to be downloaded.
         :param file_path: Local file path to save the downloaded data.
@@ -80,6 +80,21 @@ class S3Service(BaseStorage):
             return False
         return file_path
     
+    def upload(self, file_path: str, key: str) -> bool:
+        """
+        Upload a file to S3 bucket.
+
+        :param file_path: Local file path to be uploaded.
+        :param key: Key under which the file will be stored in S3.
+        :return: True if upload was successful, False otherwise.
+        """
+        try: 
+            self.client.upload_file(file_path, self.bucket_name, key)
+            return True
+        except ClientError as e:
+            logger.error(f"Failed to upload {file_path} to S3: {e}")
+            return False
+    
     def list_objects(self, prefix: str = ''):
         """
         List objects in the S3 bucket in a directory.
@@ -90,6 +105,25 @@ class S3Service(BaseStorage):
         logger.info(f"Listing objects with prefix: {prefix}")
         response = self.client.list_objects_v2(Bucket=self.bucket_name, Prefix=prefix)
         return [obj['Key'] for obj in response.get('Contents', [])]
+    
+    def count_objects(self, prefix: str = '') -> int:
+        """
+        Count objects in the S3 bucket with a given prefix.
+
+        :param prefix: Prefix to filter the objects.
+        :return: Number of objects in the bucket with the given prefix.
+        """
+        response = self.client.list_objects_v2(Bucket=self.bucket_name, Prefix=prefix)
+        return len(response.get('Contents', []))
+    
+    def get_paginator(self, prefix: str = ''):
+        """
+        Get a paginator for listing objects in the S3 bucket.
+
+        :param prefix: Prefix to filter the objects.
+        :return: Paginator object.
+        """
+        return self.client.get_paginator('list_objects_v2').paginate(Bucket=self.bucket_name, Prefix=prefix)
 
     def is_connected(self):
         try:
