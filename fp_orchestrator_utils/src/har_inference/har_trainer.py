@@ -5,6 +5,7 @@ import numpy as np
 import logging
 import os
 from fp_orchestrator_utils.storage.s3 import S3Service, S3Config
+from .har_dataset import HARDataModule
 
 logger = logging.getLogger(__name__)
 
@@ -31,51 +32,23 @@ class HARTrainer:
         :param upload_features: List of dictionaries with 'features', 'label', and 'n_users' keys.
         """
         logger.info(f"Preparing data with {len(upload_features)} samples")
+        
+        data_module = HARDataModule(
+            upload_features,
+            labels,
+            batch_size=32,
+            train_split=0.8,
+            val_split=0.2,
+        )
 
-        dataset = VariableLengthDataset(upload_features, labels)
 
-        # Split into training and validation sets
-        train_size = int(0.8 * len(dataset))
-        val_size = len(dataset) - train_size
-        train_datasert, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
+        train_loader = data_module.train_dataloader()
+        val_loader = data_module.val_dataloader()
 
-        # Create DataLoaders
-        train_loader = torch.utils.data.DataLoader(train_datasert, batch_size=32, shuffle=True, collate_fn=self.collate_variable_length)
-        val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=32, shuffle=False, collate_fn=self.collate_variable_length)
+        logger.info(f"Sensor info: {data_module.get_sensor_info()}")
+        logger.info(f"Class distribution: {data_module.get_class_distribution()}")
 
         return train_loader, val_loader
-    
-    def collate_variable_length(self, batch):
-        """
-        Custom collate function to handle variable-length sequences.
-        """
-        sensor_data = {}
-        n_users_list = []
-        labels_list = []
-
-        # Get all sensor types from the first sample
-        sample_sensors = batch[0]['features'].keys()
-
-        for sensor_type in sample_sensors:
-            if sensor_type == 'audio':
-                audio_tensors = [torch.tensor(sample['features']['audio'], dtype=torch.float32) for sample in batch]
-                padded_sequences = nn.utils.rnn.pad_sequence(audio_tensors, batch_first=True)
-                sensor_data['audio'] = padded_sequences
-            else:
-                # Variable-length sensors, pad sequences
-                sequences = [torch.tensor(sample['features'][sensor_type], dtype=torch.float32) for sample in batch]
-                padded_sequences = nn.utils.rnn.pad_sequence(sequences, batch_first=True)
-                sensor_data[sensor_type] = padded_sequences
-
-        # Collect n_users and labels
-        for item in batch:
-            n_users_list.append(item['n_users'])
-            labels_list.append(item['label'])
-
-        n_users_tensor = torch.tensor(n_users_list, dtype=torch.float32)
-        labels_tensor = torch.tensor(labels_list, dtype=torch.long)
-
-        return sensor_data, n_users_tensor, labels_tensor
 
     def load_checkpoint(self, checkpoint_path: str = 'best_har_model.pth') -> bool:
         """
@@ -239,20 +212,3 @@ class HARTrainer:
         except Exception as e:
             logger.error(f"Failed to upload ONNX model to S3: {e}")
         logger.info("Export to ONNX completed.")
-
-class VariableLengthDataset(torch.utils.data.Dataset):
-    def __init__(self, upload_features: list, labels: np.ndarray):
-        self.upload_features = upload_features
-        self.labels = labels
-
-    def __len__(self):
-        return len(self.upload_features)
-
-    def __getitem__(self, idx):
-        upload_sample = self.upload_features[idx]
-
-        return {
-            'features': upload_sample['features'],
-            'n_users': upload_sample['n_users'],
-            'label': self.labels[idx]
-        }
