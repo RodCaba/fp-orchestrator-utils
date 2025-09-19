@@ -10,6 +10,23 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 
 logger = logging.getLogger(__name__)
 
+
+class ONNXModelWrapper(torch.nn.Module):
+            def __init__(self, model):
+                super().__init__()
+                self.model = model
+                
+            def forward(self, accelerometer, gyroscope, totalacceleration, gravity, orientation, audio, n_users):
+                sensor_data = {
+                    'accelerometer': accelerometer,
+                    'gyroscope': gyroscope,
+                    'totalacceleration': totalacceleration,
+                    'gravity': gravity,
+                    'orientation': orientation,
+                    'audio': audio
+                }
+                return self.model(sensor_data, n_users)
+
 class HARTrainer:
     def __init__(self, model: HARModel, device: str = 'cpu'):
         self.model = model
@@ -198,32 +215,38 @@ class HARTrainer:
         self.model.eval()
         batch_size = 1
         seq_length = 50
-        # Create dummy inputs with correct shapes
-        dummy_sensor_data = {
-            'accelerometer': torch.randn(batch_size, seq_length, 3),
-            'gyroscope': torch.randn(batch_size, seq_length, 3),
-            'totalacceleration': torch.randn(batch_size, seq_length, 3),
-            'gravity': torch.randn(batch_size, seq_length, 3),
-            'orientation': torch.randn(batch_size, seq_length, 7),
-            'audio': torch.randn(batch_size, 5, 64, 126)
-        }
-        dummy_n_users = torch.tensor([1.0], dtype=torch.float32)
-        # Move to device
-        for sensor_type in dummy_sensor_data:
-            dummy_sensor_data[sensor_type] = dummy_sensor_data[sensor_type].to(self.device)
-        dummy_n_users = dummy_n_users.to(self.device)
+        
+        # Create dummy inputs with correct shapes for each sensor
+        dummy_accelerometer = torch.randn(batch_size, seq_length, 3).to(self.device)
+        dummy_gyroscope = torch.randn(batch_size, seq_length, 3).to(self.device)
+        dummy_totalacceleration = torch.randn(batch_size, seq_length, 3).to(self.device)
+        dummy_gravity = torch.randn(batch_size, seq_length, 3).to(self.device)
+        dummy_orientation = torch.randn(batch_size, seq_length, 7).to(self.device)
+        dummy_audio = torch.randn(batch_size, 5, 64, 126).to(self.device)
+        dummy_n_users = torch.tensor([1.0], dtype=torch.float32).to(self.device)
+
+        wrapper_model = ONNXModelWrapper(self.model).to(self.device)
 
         torch.onnx.export(
-            self.model,
-            (dummy_sensor_data, dummy_n_users),
+            wrapper_model,
+            (dummy_accelerometer, dummy_gyroscope, dummy_totalacceleration, 
+             dummy_gravity, dummy_orientation, dummy_audio, dummy_n_users),
             onnx_path,
             export_params=True,
             opset_version=11,
             do_constant_folding=True,
-            input_names=['sensor_data', 'n_users'],
+            input_names=['accelerometer', 'gyroscope', 'totalacceleration', 
+                        'gravity', 'orientation', 'audio', 'n_users'],
             output_names=['output'],
-            dynamic_axes={'sensor_data': {1: 'sequence_length'},
-                          'output': {}}
+            dynamic_axes={
+                'accelerometer': {1: 'sequence_length'},
+                'gyroscope': {1: 'sequence_length'}, 
+                'totalacceleration': {1: 'sequence_length'},
+                'gravity': {1: 'sequence_length'},
+                'orientation': {1: 'sequence_length'},
+                'audio': {2: 'audio_sequence_length'},
+                'output': {}
+            }
         )
         logger.info(f"Model exported to {onnx_path}")
 

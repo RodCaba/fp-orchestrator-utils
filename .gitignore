@@ -34,3 +34,8 @@ features_labels_debug.json
 # Best model checkpoint
 best_har_model.pth
 har_model.onnx
+
+.github/*
+
+# Test inference files
+test_inference.py

@@ -89,73 +89,7 @@ class DataLoader:
         progress_bar = tqdm.tqdm(total=total_files, desc="Preprocessing data")
 
         for upload in data:
-            upload_label = upload.get('label', None)
-            n_users = upload.get('n_users', 0)
-
-            if upload_label is None:
-                continue
-
-            batch_data = upload.get('data', [])
-
-            if not batch_data:
-                continue
-
-            sensor_sequences = {
-                'accelerometer': [],
-                'gyroscope': [],
-                'gravity': [],
-                'totalacceleration': [],
-                'orientation': [],
-                'audio': []
-            }
-
-            for item in batch_data:
-                # Skip bad tagged IMU data
-                sensor_type = item.get('sensor_type', None)
-
-                if (sensor_type == 'imu' or
-                    sensor_type == 'accelerometeruncalibrated' or
-                    sensor_type == 'gyroscopeuncalibrated'
-                    ):
-                    continue
-
-                elif sensor_type == 'audio':
-                    if 'data' not in item or 'features' not in item['data']:
-                        continue
-                    audio_batch = self._process_audio_batch(item)
-
-                    if audio_batch is not None:
-                        sensor_sequences['audio'].append(audio_batch)
-
-                else:
-                    imu_batch = self._process_imu_batch(item)
-
-                    if imu_batch is not None:
-                        sensor_sequences[sensor_type].append(imu_batch)
-            
-            # Convert lists to numpy arrays, handling empty cases
-            for sensor_type, sequence in sensor_sequences.items():
-                if sensor_type == 'audio' and sequence:
-                    sensor_sequences['audio'] = [np.array(seq) for seq in sequence]
-                elif sensor_type == 'audio':
-                    sensor_sequences['audio'] = [np.zeros((1, 126))]
-                elif sensor_type != 'audio' and sequence:
-                    sensor_sequences[sensor_type] = np.array(sequence)
-                elif sensor_type != 'audio':
-                    if sensor_type == 'orientation':
-                        sensor_sequences[sensor_type] = np.zeros((1, 7))
-                    else:
-                        sensor_sequences[sensor_type] = np.zeros((1, 3))
-            
-            # Handle missing audio
-            if not sensor_sequences['audio']:
-                sensor_sequences['audio'] = np.zeros((64, 126))
-
-            upload_sample = {
-                'features': sensor_sequences,
-                'label': upload_label,
-                'n_users': n_users
-            }
+            upload_label, upload_sample = self.process_sensor_data(upload)
 
             upload_features.append(upload_sample)
             labels.append(upload_label)
@@ -168,6 +102,74 @@ class DataLoader:
             json.dump({'features': [str(f['features']) for f in upload_features], 'labels': labels_encoded.tolist()}, f)
 
         return upload_features, labels_encoded
+
+    def process_sensor_data(self, upload: dict) -> tuple:
+        upload_label = upload.get('label', None)
+        n_users = upload.get('n_users', 0)
+
+        batch_data = upload.get('data', [])
+
+        if not batch_data:
+            return upload_label, None
+
+        sensor_sequences = {
+                'accelerometer': [],
+                'gyroscope': [],
+                'gravity': [],
+                'totalacceleration': [],
+                'orientation': [],
+                'audio': []
+            }
+
+        for item in batch_data:
+                # Skip bad tagged IMU data
+            sensor_type = item.get('sensor_type', None)
+
+            if (sensor_type == 'imu' or
+                    sensor_type == 'accelerometeruncalibrated' or
+                    sensor_type == 'gyroscopeuncalibrated'
+                    ):
+                continue
+
+            elif sensor_type == 'audio':
+                if 'data' not in item or 'features' not in item['data']:
+                    continue
+                audio_batch = self._process_audio_batch(item)
+
+                if audio_batch is not None:
+                    sensor_sequences['audio'].append(audio_batch)
+
+            else:
+                imu_batch = self._process_imu_batch(item)
+
+                if imu_batch is not None:
+                    sensor_sequences[sensor_type].append(imu_batch)
+            
+            # Convert lists to numpy arrays, handling empty cases
+        for sensor_type, sequence in sensor_sequences.items():
+            if sensor_type == 'audio' and sequence:
+                sensor_sequences['audio'] = [np.array(seq) for seq in sequence]
+            elif sensor_type == 'audio':
+                sensor_sequences['audio'] = [np.zeros((1, 126))]
+            elif sensor_type != 'audio' and sequence:
+                sensor_sequences[sensor_type] = np.array(sequence)
+            elif sensor_type != 'audio':
+                if sensor_type == 'orientation':
+                    sensor_sequences[sensor_type] = np.zeros((1, 7))
+                else:
+                    sensor_sequences[sensor_type] = np.zeros((1, 3))
+            
+            # Handle missing audio
+        if not sensor_sequences['audio']:
+            sensor_sequences['audio'] = np.zeros((64, 126))
+
+        upload_sample = {
+                'features': sensor_sequences,
+                'label': upload_label,
+                'n_users': n_users
+            }
+        
+        return upload_label,upload_sample
 
     def _process_imu_batch(self, imu_data: dict) -> np.ndarray:
         """
