@@ -28,10 +28,10 @@ with open(here / "LICENSE", "r") as license_file:
 
 setup(
     name="fp-orchestrator-utils",
-    version="0.3.0",
+    version="0.4.0",
     author="Rodrigo",
     author_email="rodser4@gmail.com",
-    description="Utilities for the FP Orchestrator, including CLI tools for managing Protocol Buffers",
+    description="Utilities for the FP Orchestrator, including CLI tools for managing Protocol Buffers, S3 interactions, and HAR model training and inference.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/RodCaba/fp-orchestrator-utils",

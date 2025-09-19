@@ -5,6 +5,8 @@ import numpy as np
 import logging
 import os
 from fp_orchestrator_utils.storage.s3 import S3Service, S3Config
+from .har_dataset import HARDataModule
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, classification_report
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +14,7 @@ class HARTrainer:
     def __init__(self, model: HARModel, device: str = 'cpu'):
         self.model = model
         self.device = device
+        self.model.to(self.device)
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
         self.best_val_acc = 0.0
@@ -31,51 +34,23 @@ class HARTrainer:
         :param upload_features: List of dictionaries with 'features', 'label', and 'n_users' keys.
         """
         logger.info(f"Preparing data with {len(upload_features)} samples")
+        
+        data_module = HARDataModule(
+            upload_features,
+            labels,
+            batch_size=32,
+            train_split=0.8,
+            val_split=0.2,
+        )
 
-        dataset = VariableLengthDataset(upload_features, labels)
 
-        # Split into training and validation sets
-        train_size = int(0.8 * len(dataset))
-        val_size = len(dataset) - train_size
-        train_datasert, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
+        train_loader = data_module.train_dataloader()
+        val_loader = data_module.val_dataloader()
 
-        # Create DataLoaders
-        train_loader = torch.utils.data.DataLoader(train_datasert, batch_size=32, shuffle=True, collate_fn=self.collate_variable_length)
-        val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=32, shuffle=False, collate_fn=self.collate_variable_length)
+        logger.info(f"Sensor info: {data_module.get_sensor_info()}")
+        logger.info(f"Class distribution: {data_module.get_class_distribution()}")
 
         return train_loader, val_loader
-    
-    def collate_variable_length(self, batch):
-        """
-        Custom collate function to handle variable-length sequences.
-        """
-        sensor_data = {}
-        n_users_list = []
-        labels_list = []
-
-        # Get all sensor types from the first sample
-        sample_sensors = batch[0]['features'].keys()
-
-        for sensor_type in sample_sensors:
-            if sensor_type == 'audio':
-                audio_tensors = [torch.tensor(sample['features']['audio'], dtype=torch.float32) for sample in batch]
-                padded_sequences = nn.utils.rnn.pad_sequence(audio_tensors, batch_first=True)
-                sensor_data['audio'] = padded_sequences
-            else:
-                # Variable-length sensors, pad sequences
-                sequences = [torch.tensor(sample['features'][sensor_type], dtype=torch.float32) for sample in batch]
-                padded_sequences = nn.utils.rnn.pad_sequence(sequences, batch_first=True)
-                sensor_data[sensor_type] = padded_sequences
-
-        # Collect n_users and labels
-        for item in batch:
-            n_users_list.append(item['n_users'])
-            labels_list.append(item['label'])
-
-        n_users_tensor = torch.tensor(n_users_list, dtype=torch.float32)
-        labels_tensor = torch.tensor(labels_list, dtype=torch.long)
-
-        return sensor_data, n_users_tensor, labels_tensor
 
     def load_checkpoint(self, checkpoint_path: str = 'best_har_model.pth') -> bool:
         """
@@ -92,6 +67,7 @@ class HARTrainer:
                 return False
             checkpoint = torch.load(checkpoint_path, map_location=self.device)
             self.model.load_state_dict(checkpoint)
+            self.model.to(self.device)
             logger.info(f"Loaded checkpoint from {checkpoint_path}")
             return True
         except Exception as e:
@@ -104,8 +80,8 @@ class HARTrainer:
         """
         self.model.eval()
         val_loss = 0.0
-        val_correct = 0
-        val_total = 0
+        all_predicted = []
+        all_labels = []
 
         with torch.no_grad():
             for sensor_data, n_users, labels in val_loader:
@@ -119,13 +95,31 @@ class HARTrainer:
 
                 val_loss += loss.item()
                 _, predicted = torch.max(outputs.data, 1)
-                val_total += labels.size(0)
-                val_correct += (predicted == labels).sum().item()
+                all_labels.extend(labels.cpu().numpy())
+                all_predicted.extend(predicted.cpu().numpy())
 
-        val_acc = 100 * val_correct / val_total if val_total > 0 else 0
-        avg_val_loss = val_loss / len(val_loader) if len(val_loader) > 0 else 0
+        all_predicted = np.array(all_predicted)
+        all_labels = np.array(all_labels)
 
-        logger.info(f'Validation Loss: {avg_val_loss:.4f}, Validation Acc: {val_acc:.2f}%')
+        # Basic metrics
+        val_acc = accuracy_score(all_labels, all_predicted) * 100
+        avg_val_loss = val_loss / len(val_loader) if len(val_loader) > 0 else 0.0
+        # Detailed metrics
+        val_precision = precision_score(all_labels, all_predicted, average='weighted', zero_division=0)
+        val_recall = recall_score(all_labels, all_predicted, average='weighted', zero_division=0)
+        val_f1 = f1_score(all_labels, all_predicted, average='weighted', zero_division=0)
+        cm = confusion_matrix(all_labels, all_predicted)
+        class_report = classification_report(all_labels, all_predicted)
+
+        logger.info(f"Validation Metrics: \n")
+        logger.info(f"Accuracy: {val_acc:.2f}% \n")
+        logger.info(f"Precision: {val_precision:.4f} \n")
+        logger.info(f"Recall: {val_recall:.4f} \n")
+        logger.info(f"F1 Score: {val_f1:.4f} \n")
+        logger.info(f"Confusion Matrix: \n{cm} \n")
+        logger.info(f"Classification Report: \n{class_report} \n")
+
+
         return val_acc, avg_val_loss
 
     def train(
@@ -239,20 +233,3 @@ class HARTrainer:
         except Exception as e:
             logger.error(f"Failed to upload ONNX model to S3: {e}")
         logger.info("Export to ONNX completed.")
-
-class VariableLengthDataset(torch.utils.data.Dataset):
-    def __init__(self, upload_features: list, labels: np.ndarray):
-        self.upload_features = upload_features
-        self.labels = labels
-
-    def __len__(self):
-        return len(self.upload_features)
-
-    def __getitem__(self, idx):
-        upload_sample = self.upload_features[idx]
-
-        return {
-            'features': upload_sample['features'],
-            'n_users': upload_sample['n_users'],
-            'label': self.labels[idx]
-        }
