@@ -6,6 +6,7 @@ import logging
 import os
 from fp_orchestrator_utils.storage.s3 import S3Service, S3Config
 from .har_dataset import HARDataModule
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, classification_report
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,7 @@ class HARTrainer:
     def __init__(self, model: HARModel, device: str = 'cpu'):
         self.model = model
         self.device = device
+        self.model.to(self.device)
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
         self.best_val_acc = 0.0
@@ -65,6 +67,7 @@ class HARTrainer:
                 return False
             checkpoint = torch.load(checkpoint_path, map_location=self.device)
             self.model.load_state_dict(checkpoint)
+            self.model.to(self.device)
             logger.info(f"Loaded checkpoint from {checkpoint_path}")
             return True
         except Exception as e:
@@ -77,8 +80,8 @@ class HARTrainer:
         """
         self.model.eval()
         val_loss = 0.0
-        val_correct = 0
-        val_total = 0
+        all_predicted = []
+        all_labels = []
 
         with torch.no_grad():
             for sensor_data, n_users, labels in val_loader:
@@ -92,13 +95,31 @@ class HARTrainer:
 
                 val_loss += loss.item()
                 _, predicted = torch.max(outputs.data, 1)
-                val_total += labels.size(0)
-                val_correct += (predicted == labels).sum().item()
+                all_labels.extend(labels.cpu().numpy())
+                all_predicted.extend(predicted.cpu().numpy())
 
-        val_acc = 100 * val_correct / val_total if val_total > 0 else 0
-        avg_val_loss = val_loss / len(val_loader) if len(val_loader) > 0 else 0
+        all_predicted = np.array(all_predicted)
+        all_labels = np.array(all_labels)
 
-        logger.info(f'Validation Loss: {avg_val_loss:.4f}, Validation Acc: {val_acc:.2f}%')
+        # Basic metrics
+        val_acc = accuracy_score(all_labels, all_predicted) * 100
+        avg_val_loss = val_loss / len(val_loader) if len(val_loader) > 0 else 0.0
+        # Detailed metrics
+        val_precision = precision_score(all_labels, all_predicted, average='weighted', zero_division=0)
+        val_recall = recall_score(all_labels, all_predicted, average='weighted', zero_division=0)
+        val_f1 = f1_score(all_labels, all_predicted, average='weighted', zero_division=0)
+        cm = confusion_matrix(all_labels, all_predicted)
+        class_report = classification_report(all_labels, all_predicted)
+
+        logger.info(f"Validation Metrics: \n")
+        logger.info(f"Accuracy: {val_acc:.2f}% \n")
+        logger.info(f"Precision: {val_precision:.4f} \n")
+        logger.info(f"Recall: {val_recall:.4f} \n")
+        logger.info(f"F1 Score: {val_f1:.4f} \n")
+        logger.info(f"Confusion Matrix: \n{cm} \n")
+        logger.info(f"Classification Report: \n{class_report} \n")
+
+
         return val_acc, avg_val_loss
 
     def train(
