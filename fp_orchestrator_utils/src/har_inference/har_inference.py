@@ -14,6 +14,16 @@ class HARInference:
 
    Loads a trained HAR model and performs inference on new data.
    """
+   
+   # Activity class mapping based on the training data
+   CLASS_NAMES = {
+       0: "Cleaning",
+       1: "Cooking", 
+       2: "Eating",
+       3: "Eating - Watching TV",
+       4: "Playing",
+       5: "Watching TV"
+   }
 
    def __init__(self, device: str = 'cpu', load_from_s3: bool = True):
       s3_config = S3Config(
@@ -190,7 +200,13 @@ class HARInference:
       predictions = ort_outs[0]
       probabilities = torch.softmax(torch.tensor(predictions), dim=1).numpy()
       predicted_classes = predictions.argmax(axis=1)
+      
+      # Convert class indices to names
+      predicted_class_names = [self.CLASS_NAMES.get(class_idx, f"Unknown_{class_idx}") 
+                              for class_idx in predicted_classes]
+      
       return {
           'predictions': predicted_classes.tolist(),
+          'predicted_class_names': predicted_class_names,
           'probabilities': probabilities.tolist(),
       }
