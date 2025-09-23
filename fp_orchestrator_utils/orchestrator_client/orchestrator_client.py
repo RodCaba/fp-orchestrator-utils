@@ -123,8 +123,6 @@ class OrchestratorClient:
         :return: Response from the orchestrator.
         """
         try:
-            self.logger.info(f"Sending IMU data for device {device_id}: {imu_data}")
-            
             # Validate input data
             if 'sensor_type' not in imu_data:
                 raise ValueError("Missing 'sensor_type' in imu_data")
@@ -132,8 +130,6 @@ class OrchestratorClient:
                 raise ValueError("Missing 'values' in imu_data")
             
             sensor_type = imu_data['sensor_type']
-            self.logger.debug(f"Processing sensor type: {sensor_type}")
-            
             if sensor_type == "orientation":
                 # Validate orientation data
                 required_fields = ['qx', 'qy', 'qz', 'qw', 'roll', 'pitch', 'yaw']
@@ -169,8 +165,6 @@ class OrchestratorClient:
                     standard=values
                 )
             
-            self.logger.debug(f"Created sensor values: {sensor_values}")
-            
             sensor_data = imu_service_pb2.SensorData(
                 sensor_type=sensor_type,
                 values=sensor_values
@@ -181,18 +175,14 @@ class OrchestratorClient:
                 data=sensor_data,
             )
             
-            self.logger.debug(f"Sending request: {request}")
-            
             # Test if the request can be serialized properly
             try:
-                serialized_request = request.SerializeToString()
-                self.logger.debug(f"Request serialized successfully, size: {len(serialized_request)} bytes")
+                request.SerializeToString()
             except Exception as e:
                 self.logger.error(f"Failed to serialize request: {e}")
                 raise ValueError(f"Invalid request data: {e}")
                 
             response = self.stub.ReceiveIMUData(request, timeout=self.timeout)
-            self.logger.debug(f"Received response: {response}")
             
             return self._parsed_response(
                 response,

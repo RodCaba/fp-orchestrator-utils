@@ -96,7 +96,7 @@ def collate_variable_length(batch: list[dict]) -> tuple:
             labels_list.append(item['label'])
 
         n_users_tensor = torch.tensor(n_users_list, dtype=torch.float32)
-        labels_tensor = torch.tensor(labels_list, dtype=torch.long)
+        labels_tensor = torch.tensor(labels_list, dtype=torch.long) if labels_list else None
 
         return sensor_data, n_users_tensor, labels_tensor
 
